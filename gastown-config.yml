@@ -1,0 +1,510 @@
+# Gastown Infrastructure Configuration
+# Geekcon Herbs - ECW Deployment with villaai AWS Profile
+
+version: "2.0"
+
+# Project Metadata
+project:
+  name: geekcon-herbs
+  environment: production
+  region: ap-southeast-1  # Singapore region (villaai profile default)
+  aws_profile: villaai
+  deployment_method: gastown
+  infrastructure_as_code: terraform
+  aws_account: "914499832220"
+  # MEOW Principle: Well-documented deployment configuration
+
+# MEOW Principle Structure
+# M - Modular: Separated concerns (compute, network, storage, monitoring)
+# E - Efficient: RAM-optimized instance for performance
+# O - Observable: Full monitoring and logging
+# W - Well-documented: Complete documentation and testing
+
+# Infrastructure Components
+infrastructure:
+  # Compute Configuration
+  compute:
+    instance_type: r6i.4xlarge  # RAM-optimized: 128 GB RAM, 16 vCPUs
+    # Alternative options for 128GB RAM:
+    # - r6i.4xlarge: 128 GB, 16 vCPUs (Intel, latest gen)
+    # - r5.4xlarge: 128 GB, 16 vCPUs (Intel, previous gen)
+    # - r6a.4xlarge: 128 GB, 16 vCPUs (AMD, cost-effective)
+    
+    ami: ami-latest-amazon-linux-2023-arm64  # Use appropriate AMI
+    root_volume:
+      size: 100  # GB
+      type: gp3
+      iops: 3000
+      throughput: 125
+    
+    additional_volumes:
+      - name: app-data
+        size: 500  # GB
+        type: gp3
+        mount_point: /opt/geekcon
+        iops: 3000
+    
+    user_data_script: ./scripts/init-instance.sh
+    
+    tags:
+      Name: geekcon-herbs-web
+      Environment: production
+      ManagedBy: gastown
+      Project: geekcon-herbs
+      Principle: MEOW
+
+  # Network Configuration (ECW)
+  network:
+    vpc:
+      cidr: 10.0.0.0/16
+      enable_dns_hostnames: true
+      enable_dns_support: true
+      
+    subnets:
+      public:
+        - cidr: 10.0.1.0/24
+          availability_zone: ap-southeast-1a
+          name: public-subnet-1
+        - cidr: 10.0.2.0/24
+          availability_zone: ap-southeast-1b
+          name: public-subnet-2
+      
+      private:
+        - cidr: 10.0.10.0/24
+          availability_zone: ap-southeast-1a
+          name: private-subnet-1
+        - cidr: 10.0.11.0/24
+          availability_zone: ap-southeast-1b
+          name: private-subnet-2
+    
+    internet_gateway:
+      enabled: true
+    
+    nat_gateway:
+      enabled: true
+      count: 2  # High availability
+    
+    security_groups:
+      web:
+        name: geekcon-web-sg
+        description: Security group for web application
+        ingress:
+          - port: 443
+            protocol: tcp
+            cidr: 0.0.0.0/0
+            description: HTTPS traffic
+          - port: 80
+            protocol: tcp
+            cidr: 0.0.0.0/0
+            description: HTTP traffic (redirect to HTTPS)
+          - port: 22
+            protocol: tcp
+            cidr: 10.0.0.0/16
+            description: SSH from VPC only
+        egress:
+          - port: 0
+            protocol: -1
+            cidr: 0.0.0.0/0
+            description: All outbound traffic
+
+  # Load Balancing
+  load_balancer:
+    type: application
+    scheme: internet-facing
+    ip_address_type: ipv4
+    
+    listeners:
+      - port: 443
+        protocol: HTTPS
+        ssl_policy: ELBSecurityPolicy-TLS-1-2-2017-01
+        certificate_arn: ${CERTIFICATE_ARN}  # To be configured
+        default_action: forward
+      
+      - port: 80
+        protocol: HTTP
+        default_action: redirect_to_https
+    
+    target_group:
+      port: 3000
+      protocol: HTTP
+      health_check:
+        path: /api/health
+        interval: 30
+        timeout: 5
+        healthy_threshold: 2
+        unhealthy_threshold: 3
+    
+    tags:
+      Name: geekcon-herbs-alb
+      Environment: production
+
+  # Auto Scaling (Optional)
+  auto_scaling:
+    enabled: false  # Single instance for now, enable for scaling
+    min_size: 1
+    max_size: 3
+    desired_capacity: 1
+    
+    scaling_policies:
+      - name: cpu-based-scaling
+        metric: CPUUtilization
+        target: 70
+      - name: memory-based-scaling
+        metric: MemoryUtilization
+        target: 75
+
+  # Storage
+  storage:
+    s3_buckets:
+      - name: geekcon-herbs-assets
+        purpose: Static assets and media
+        versioning: true
+        lifecycle_rules:
+          - transition_to_ia: 30  # days
+          - transition_to_glacier: 90  # days
+        
+      - name: geekcon-herbs-backups
+        purpose: Database and configuration backups
+        versioning: true
+        encryption: AES256
+    
+    # DynamoDB (per user rules)
+    dynamodb:
+      tables:
+        - name: geekcon-products
+          partition_key: productId
+          sort_key: version
+          billing_mode: PAY_PER_REQUEST
+          point_in_time_recovery: true
+          
+        - name: geekcon-users
+          partition_key: userId
+          billing_mode: PAY_PER_REQUEST
+          point_in_time_recovery: true
+          
+        - name: geekcon-orders
+          partition_key: orderId
+          sort_key: createdAt
+          billing_mode: PAY_PER_REQUEST
+          point_in_time_recovery: true
+          
+          global_secondary_indexes:
+            - name: UserOrdersIndex
+              partition_key: userId
+              sort_key: createdAt
+              projection: ALL
+
+  # Monitoring & Observability (MEOW - Observable)
+  monitoring:
+    cloudwatch:
+      log_groups:
+        - name: /geekcon/application
+          retention_days: 30
+        - name: /geekcon/nginx
+          retention_days: 7
+        - name: /geekcon/system
+          retention_days: 14
+      
+      alarms:
+        - name: high-cpu
+          metric: CPUUtilization
+          threshold: 80
+          period: 300
+          evaluation_periods: 2
+          
+        - name: high-memory
+          metric: MemoryUtilization
+          threshold: 85
+          period: 300
+          evaluation_periods: 2
+          
+        - name: disk-space
+          metric: DiskSpaceUtilization
+          threshold: 80
+          period: 300
+          evaluation_periods: 1
+    
+    cloudwatch_agent:
+      enabled: true
+      metrics:
+        - namespace: GeekconHerbs
+          metrics:
+            - memory_utilization
+            - disk_utilization
+            - network_throughput
+      
+    dashboards:
+      - name: geekcon-overview
+        widgets:
+          - type: metric
+            metrics: [CPUUtilization, MemoryUtilization]
+          - type: log_insights
+            query: |
+              fields @timestamp, @message
+              | filter @message like /ERROR/
+              | sort @timestamp desc
+
+  # Security
+  security:
+    iam_roles:
+      - name: geekcon-ec2-role
+        policies:
+          - AmazonSSMManagedInstanceCore
+          - CloudWatchAgentServerPolicy
+          - AmazonS3ReadOnlyAccess  # For assets bucket
+        
+        custom_policy:
+          dynamodb:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          s3:
+            - s3:PutObject
+            - s3:GetObject
+            resources:
+              - arn:aws:s3:::geekcon-herbs-assets/*
+    
+    secrets_manager:
+      - name: geekcon/production/database
+        description: Database connection strings
+      - name: geekcon/production/api-keys
+        description: Third-party API keys
+      - name: geekcon/production/jwt-secret
+        description: JWT signing secret
+    
+    waf:
+      enabled: true
+      rules:
+        - rate_limit: 2000  # requests per 5 minutes
+        - sql_injection_protection: true
+        - xss_protection: true
+        - geo_blocking:
+            - CN  # Example country codes
+            - RU
+
+# Application Configuration
+application:
+  name: geekcon-herbs-web
+  runtime: nodejs
+  version: 20.x
+  
+  framework: nextjs
+  build_command: npm run build
+  start_command: npm run start
+  port: 3000
+  
+  environment_variables:
+    NODE_ENV: production
+    PORT: 3000
+    AWS_REGION: ap-southeast-1
+    # Secrets from AWS Secrets Manager (referenced, not hardcoded)
+    DATABASE_URL: ${secrets:geekcon/production/database:connection_string}
+    JWT_SECRET: ${secrets:geekcon/production/jwt-secret:value}
+  
+  health_check:
+    path: /api/health
+    interval: 30
+    timeout: 5
+  
+  # MEOW - Well-documented
+  documentation:
+    api_docs: /api/docs
+    openapi_spec: /api/openapi.json
+
+# Deployment Configuration
+deployment:
+  method: gastown
+  strategy: blue-green  # Zero downtime deployments
+  
+  pre_deployment:
+    - run: npm ci
+    - run: npm run test
+    - run: npm run lint
+    - run: npm run build
+  
+  deployment_steps:
+    - name: backup-current
+      action: create_ami
+    - name: upload-artifacts
+      action: s3_sync
+      source: .next/
+      destination: s3://geekcon-herbs-artifacts/${VERSION}/
+    - name: update-instance
+      action: deploy_code
+    - name: health-check
+      action: verify_health
+      timeout: 300
+  
+  post_deployment:
+    - run: npm run db:migrate
+    - run: npm run cache:warm
+    - notify: slack
+  
+  rollback:
+    enabled: true
+    automatic: true
+    conditions:
+      - failed_health_checks: 3
+      - error_rate: 5  # percent
+
+# MEOW Principle Implementation Details
+meow_principle:
+  modular:
+    description: |
+      Infrastructure is split into logical modules:
+      - Compute (EC2 instances)
+      - Network (VPC, subnets, security groups)
+      - Storage (S3, DynamoDB)
+      - Monitoring (CloudWatch)
+      Each module can be updated independently.
+    
+  efficient:
+    description: |
+      - RAM-optimized EC2 instance (r6i.4xlarge) with 128GB RAM
+      - Ensures high performance for Next.js SSR and caching
+      - gp3 volumes with optimized IOPS
+      - DynamoDB with on-demand billing for cost efficiency
+    
+  observable:
+    description: |
+      - Comprehensive CloudWatch logging
+      - Real-time metrics and alarms
+      - Custom dashboards for application monitoring
+      - Integration with Playwright MCP for UI testing
+    
+  well_documented:
+    description: |
+      - This configuration file serves as documentation
+      - Design document (DESIGN_DOCUMENT.md) for UI/UX
+      - API documentation at /api/docs
+      - Inline comments in all infrastructure code
+
+# Testing Configuration (Playwright MCP)
+testing:
+  playwright:
+    enabled: true
+    mcp_integration: true
+    
+    test_environments:
+      - name: staging
+        url: https://staging.geekconherbs.com
+      - name: production
+        url: https://geekconherbs.com
+    
+    test_suites:
+      ui_visual:
+        - homepage_hero
+        - product_grid
+        - navigation_desktop
+        - navigation_mobile
+        - product_detail
+        - cart_drawer
+        - checkout_flow
+      
+      ui_interaction:
+        - button_states
+        - form_validation
+        - modal_behavior
+        - carousel_navigation
+        - filter_interactions
+        - add_to_cart
+      
+      accessibility:
+        - keyboard_navigation
+        - focus_management
+        - aria_attributes
+        - color_contrast
+        - screen_reader_support
+      
+      performance:
+        - lighthouse_mobile
+        - lighthouse_desktop
+        - core_web_vitals
+        - bundle_size
+    
+    schedule:
+      regression_tests: "0 2 * * *"  # Daily at 2 AM
+      smoke_tests: "*/30 * * * *"    # Every 30 minutes
+    
+    notifications:
+      on_failure:
+        - slack: "#geekcon-alerts"
+        - email: "dev-team@geekconherbs.com"
+    
+    browsers:
+      - chromium
+      - firefox
+      - webkit
+    
+    devices:
+      - "iPhone 14"
+      - "iPhone 14 Pro"
+      - "iPad Pro"
+      - "Desktop Chrome"
+      - "Desktop Safari"
+
+# Backup & Disaster Recovery
+backup:
+  ami_snapshots:
+    frequency: daily
+    retention: 7
+    time: "03:00"
+  
+  dynamodb_backup:
+    point_in_time_recovery: true
+    on_demand_backup:
+      frequency: daily
+      retention: 30
+  
+  s3_backup:
+    versioning: true
+    cross_region_replication:
+      enabled: true
+      destination_region: us-east-1
+
+# Cost Management
+cost_management:
+  budget:
+    monthly_limit: 1000  # USD
+    alerts:
+      - threshold: 80
+        notification: email
+      - threshold: 100
+        notification: email_and_slack
+  
+  optimization:
+    - reserved_instances: consider_after_3_months
+    - spot_instances: false  # Not for production web
+    - s3_lifecycle: enabled
+    - dynamodb_autoscaling: enabled
+
+# Tags (Applied to all resources)
+tags:
+  Project: geekcon-herbs
+  Environment: production
+  ManagedBy: gastown
+  Owner: villaai
+  Principle: MEOW
+  CostCenter: geekcon-production
+  Compliance: none
+  BackupPolicy: daily
+
+# Notes
+notes: |
+  This configuration follows the MEOW principle:
+  - Modular: Clear separation of concerns
+  - Efficient: RAM-optimized instance (128GB) for peak performance
+  - Observable: Full monitoring and logging stack
+  - Well-documented: Comprehensive documentation and testing
+  
+  AWS Profile: villaai
+  Region: us-west-2 (adjust based on requirements)
+  Instance: r6i.4xlarge (128GB RAM, 16 vCPUs)
+  
+  Playwright MCP integration ensures continuous UI testing
+  and validation against the design document.
+  
+  All infrastructure is deployed in a new ECW (Elastic Compute Workspace)
+  managed by Gastown automation.
