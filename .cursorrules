@@ -1,0 +1,384 @@
+# Cursor Rules for Gastown & Geekcon Herbs Project
+
+## Gastown Core Principles
+
+### Installation & Setup
+- **User**: Can be any username (typically `gastown` or `mayor`)
+- **Workspace**: `$HOME/gt` (e.g., `/home/gastown/gt`)
+- **Convention**: Install at `~/gt` using `gt install ~/gt --git`
+- **Binaries**: `gt` (Gastown) and `bd` (Beads) in `/usr/local/bin`
+- **UI**: tmux is the primary interface for Gas Town
+- **Git**: All towns are git-backed
+
+### MEOW Stack (Molecular Expression of Work)
+1. **Beads**: Atomic work units (issues) stored in JSONL, backed by Git
+2. **Epics**: Beads with children (parallel by default, can have dependencies)
+3. **Molecules**: Chained beads forming workflows, survive crashes/restarts
+4. **Protomolecules**: Templates/classes for molecules
+5. **Formulas**: TOML-based workflow source templates that "cook" into protomolecules
+6. **Wisps**: Ephemeral beads destroyed after runs (for orchestration)
+
+### Core Principles
+- **GUPP (Gastown Universal Propulsion Principle)**: "If there is work on your Hook, YOU MUST RUN IT"
+- **MEOW (Molecular Expression of Work)**: Break work into detailed, trackable, atomic units
+- **NDI (Nondeterministic Idempotence)**: Eventual workflow completion through persistent beads and oversight agents
+- **Physics Over Politeness**: Agents must act autonomously, not wait for permission
+- **Vibe Coding**: Focus on throughput over perfection; work flows like fish into barrels
+- **Discovery Over Tracking**: Let work emerge organically
+
+### Gas Town Roles (7 Worker Roles + Overseer)
+
+#### Town-Level Roles
+1. **Mayor** 🎩: Chief-of-staff, your main concierge, kicks off convoys, coordinates work distribution
+   - Command: `gt mayor attach` or `gt may at`
+   - Your primary interface to Gas Town
+   
+2. **Deacon** 🐺: Daemon beacon running continuous patrol cycles
+   - Monitors system health, ensures worker activity
+   - Exponential backoff when idle
+   
+3. **Dogs** 🐶: Deacon's maintenance crew
+   - Handle cleanup, health checks, system maintenance
+   - **Boot the Dog**: Special dog that checks on Deacon every 5 minutes
+
+#### Rig-Level Roles (Per Project)
+4. **Polecats** 😺: Ephemeral workers producing Merge Requests
+   - Spawn for specific tasks, work in git worktrees
+   - Self-destruct after submitting MR
+   - Best for well-defined, fully-spec'd beads
+   
+5. **Refinery** 🏭: Manages Merge Queue (MQ)
+   - Intelligently merges changes from polecats
+   - Handles conflicts, ensures code quality
+   - Runs patrol to process MQ
+   
+6. **Witness** 🦉: Patrol agent overseeing polecats and refinery
+   - Monitors progress, detects stuck agents
+   - Can trigger recovery actions
+   
+7. **Crew** 👷: Long-lived, named agents for persistent collaboration
+   - Maintain context across sessions
+   - Command: `gt crew at` or `gt crew add <rig> <name>`
+   - Use for design work, reviews, hands-on discussions
+   - Cycle through crew: `C-b n/p` in tmux
+
+8. **Overseer** 👤: That's you, the human
+   - Has identity in system, own inbox, can send/receive mail
+   - The boss, head honcho, big cheese
+
+### Key Commands
+
+#### Core Git Town Commands
+```bash
+# Install town
+gt install ~/gt --git
+
+# Add a rig (project)
+gt rig add <name> <path> --adopt --prefix <PREFIX>
+
+# List rigs
+gt rig list
+
+# Town status
+gt status
+
+# Start Mayor
+gt mayor attach
+# or
+gt may at
+
+# Crew management
+gt crew add <rig> <name>
+gt crew at <rig> <name>
+gt crew remove <rig> <name>
+
+# Sling work to agents
+gt sling <bead-id> <agent>
+
+# Handoff (restart session)
+gt handoff
+# or in chat
+/handoff
+# or say "let's hand off"
+
+# Talk to previous session
+gt seance
+
+# Messaging
+gt nudge <agent>  # Real-time message to agent
+gt ready          # View ready work
+
+# Convoys (work orders)
+gt convoy create
+gt convoy list
+gt convoy show <id>
+```
+
+#### Beads Commands
+```bash
+# Initialize beads
+bd init
+
+# Create new bead
+bd new --type <type> --title "Title" --body "Description"
+# Valid types: bug, feature, task, epic, chore
+
+# List beads
+bd list           # Open beads only
+bd list --all     # All beads
+bd list --status closed
+
+# Show bead
+bd show <bead-id>
+
+# Close bead
+bd close <bead-id>
+
+# Reopen bead
+bd reopen <bead-id>
+```
+
+### tmux Essential Keybindings
+```
+C-b s       - list sessions, switch/snoop
+C-b [       - copy mode (scroll), ESC to exit
+C-b n/p     - next/previous in group (cycle crew)
+C-b d       - detach from session
+C-b w       - list windows
+C-b c       - create new window
+C-b 0-9     - switch to window N
+```
+
+### Development Loops (from Vibe Coding book)
+
+#### Outer Loop (days to weeks)
+- Upgrade Gas Town daily if actively using
+- Learn tmux incrementally
+- Bring your own workflow
+- Run regular town cleanups
+
+#### Middle Loop (hours to days)
+- You technically only need the Mayor
+- Polecats work without Refinery/Witness (manual merge)
+- OK not to swarm all the time (serial bottlenecks are normal)
+- Run regular town cleanups
+
+#### Inner Loop (seconds to minutes)
+- Sling swarm work in Convoys
+- Don't watch agents work - read their responses
+- Use `gt handoff` liberally after every task
+- Work with your Crew for design-intensive tasks
+
+### Working with Crew (Secret Weapon)
+1. Reset all crew: no hook, no mail, clean sandbox, fresh session
+2. Loop through each crew member, give each a meaty task
+3. Leave them alone to work
+4. Cycle through again, see who's finished
+5. Read results, make decisions, repeat
+
+**PR Sheriff Pattern**: Permanent crew member with standing orders to:
+- Check open PRs on every session startup
+- Divide into easy wins vs. human review
+- Sling easy wins to other crew
+- Flag complex PRs for human review
+
+### Convoy Workflow
+1. Convoy wraps related beads into tracked delivery unit
+2. Every slung work gets wrapped in a Convoy
+3. Dashboard shows convoy status with expanding trees
+4. Convoys are like features/work orders
+5. Multiple swarms can attack one convoy
+
+### Code Quality & "Invisible Garden"
+- Regular code review sweeps (agents file beads)
+- Bug-fix sweeps to fix issues found
+- Do this daily until code reviews are clean
+- Watch for "heresies" - wrong beliefs about architecture that spread
+- Capture guiding principles in agent priming to prevent heresies
+
+### Warnings & Requirements
+
+#### DO NOT USE Gas Town if:
+- You're not at least Stage 6-7 on AI Evolution (regularly use 3-5+ parallel CLI agents)
+- You care about money (it's expensive)
+- You're not comfortable with vibe coding
+- You're not willing to learn tmux basics
+
+#### Requirements:
+- Go 1.22.0+
+- tmux
+- Git
+- Claude Code (or compatible CLI agent)
+- Beads installed and working
+- Multiple Claude accounts recommended (high token usage)
+
+### Gas Town Architecture Concepts
+
+#### Persistent Identity
+- Agents are NOT sessions (sessions are ephemeral "cattle")
+- Agents ARE beads (persistent identities in Git)
+- Each agent has: Role Bead, Agent Bead, Mail inbox, Hook
+- History captured in Git via Beads
+
+#### Hook System
+- Every worker has a Hook (special pinned bead)
+- Hook holds molecules (workflows)
+- `gt sling` puts work on hooks
+- GUPP ensures hooked work gets done
+- GUPP Nudge: Workers need `gt nudge` to start (Claude Code politeness issue)
+
+#### Mail & Messaging
+- Beads used for mail and events
+- Two-level structure: Rig beads and Town beads
+- Cross-rig routing based on issue prefix
+- `gt nudge` for real-time messaging via tmux
+
+#### Patrols (Ephemeral Workflows)
+- Refinery patrol: Process Merge Queue
+- Witness patrol: Check polecats, refineries, Deacon
+- Deacon patrol: Run town plugins, manage lifecycle
+- All patrols use wisp molecules
+- Exponential backoff when no work found
+
+### Plugins
+- "Coordinated or scheduled attention from an agent"
+- Town-level: Run by Deacon with Dogs
+- Rig-level: Run by Witness
+- Lifecycle hooks and timers available
+- Most add-ons will be formulas in "Mol Mall"
+
+### Common Patterns
+
+#### Handoff Pattern
+```
+# In any worker session
+User: "let's hand off"
+# or
+User: /handoff
+# or
+!gt handoff
+```
+
+#### Sling Pattern
+```
+User to Mayor: "File a bead for X and sling it to a polecat"
+# Mayor files bead, uses gt sling to assign to polecat
+# Polecat picks up work automatically (GUPP)
+```
+
+#### Convoy Pattern
+```
+# Wrap work in convoy for tracking
+gt convoy create --title "Feature X" --beads bd-123,bd-456
+# Mayor kicks off convoy
+# Polecats swarm work
+# Witness monitors progress
+# Refinery merges results
+# Convoy completes, you get notification
+```
+
+#### Crew Cycling Pattern
+```
+# Setup crew for batch work
+1. Tell one crew member to reset all crew
+2. Cycle through crew (C-b n), give each a task
+3. Let them work
+4. Cycle again, read results, give new tasks
+5. Repeat
+```
+
+### Best Practices
+1. **Always use `gt handoff`** after tasks to keep context fresh
+2. **Don't watch agents work** - give orders, check results
+3. **Feed the swarm** with well-defined epics and molecules
+4. **Cycle your crew** for high-quality design work
+5. **Use convoys** to track all work units
+6. **Learn tmux incrementally** - just a few commands needed
+7. **Clean up regularly** - stale beads, workers, processes
+8. **Expect chaos** - vibe coding is about throughput, not perfection
+9. **Multiple accounts** - you'll need 2-3 Claude Code accounts for heavy use
+10. **Read agent responses** - stop everything and act on finished work
+
+### File Structure
+```
+~/gt/                    # Town root (HQ)
+├── .git/                # Git tracking
+├── .beads/              # Beads database (SQLite + JSONL)
+├── mayor/               # Mayor workspace
+├── deacon/              # Deacon workspace
+├── settings/            # Configuration
+├── CLAUDE.md            # Agent instructions
+└── <rig-name>/          # Project rigs
+    ├── .git/            # Project git
+    ├── .beads/          # Rig beads
+    ├── polecats/        # Polecat workspaces
+    └── crew/            # Crew member workspaces
+```
+
+### Comparison to Other Systems
+- **Like Kubernetes**: Control plane (Mayor/Deacon), execution nodes (Rigs), local agents (Witness), ephemeral workers (Polecats)
+- **Like Temporal**: Durable workflows (molecules), but via NDI instead of deterministic replay
+- **Unlike Both**: Git-backed data plane (Beads), vibe coding philosophy, AI-native design
+
+### Terminology Quick Reference
+- **Town**: Your HQ (`~/gt`)
+- **Rig**: A project under Gas Town management
+- **Bead**: Atomic work unit (issue)
+- **Molecule**: Chained beads (workflow)
+- **Wisp**: Ephemeral bead
+- **Hook**: Agent's work queue (special pinned bead)
+- **Convoy**: Work order wrapping related beads
+- **Slinging**: Assigning work (`gt sling`)
+- **Nudging**: Real-time messaging (`gt nudge`)
+- **Handoff**: Session refresh (`gt handoff`)
+- **Seance**: Talk to previous session (`gt seance`)
+- **Patrol**: Ephemeral loop workflow
+- **Guzzoline**: Molecularized work (all work in the system)
+- **War Rig**: A rig's contribution to a cross-rig convoy
+
+### Key Files to Know
+- `CLAUDE.md` - Agent priming/instructions
+- `routes.jsonl` - Rig routing configuration
+- `<rig>.beads` - Beads JSONL database
+- `.beads.db` - SQLite database (optional)
+- Agent beads, Role beads, Hooks - All in Beads
+
+### Resources
+- GitHub: https://github.com/steveyegge/gastown
+- Beads: https://github.com/steveyegge/beads
+- Steve Yegge's Blog: https://steve-yegge.medium.com/
+- Emergency Manual: https://steve-yegge.medium.com/gas-town-emergency-user-manual-cf0e4556d74b
+- Welcome Guide: https://steve-yegge.medium.com/welcome-to-gas-town-4f25ee16dd04
+
+---
+
+## Project-Specific Rules (Geekcon Herbs)
+
+### Gastown Server Setup
+- **Server**: EC2 r6i.4xlarge at 13.215.224.99 (ap-southeast-1)
+- **User**: `gastown`
+- **Workspace**: `/home/gastown/gt`
+- **Rig**: `geekcon_herbs` with prefix `GH-`
+- **SSH**: `ssh -i ~/.ssh/geekcon-herbs-key.pem ec2-user@13.215.224.99`
+- **Switch to gastown**: `sudo -u gastown bash`
+- **tmux config**: `/home/gastown/.tmux.conf` configured
+
+### Database
+- Default: DynamoDB using PynamoDB protocol
+- AWS credentials already set up (do not use environment variables)
+
+### Coding Style
+- If project uses camelCase, stick with it
+- Do not convert to snake_case unless appropriate
+- Follow existing conventions in codebase
+
+### AWS Setup
+- Cloud operator: AWS (assume credentials configured)
+- IAM Role: `geekcon-herbs-ec2-role`
+- Region: `ap-southeast-1`
+
+### Development Approach
+- Read through docs before suggesting
+- Follow MEOW principle for all work
+- Use Gastown for orchestration when appropriate
+- Default to vibe coding for agent work
