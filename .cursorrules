@@ -382,3 +382,310 @@ gt convoy create --title "Feature X" --beads bd-123,bd-456
 - Follow MEOW principle for all work
 - Use Gastown for orchestration when appropriate
 - Default to vibe coding for agent work
+
+---
+
+## Official Gastown README
+
+### Gas Town - Multi-agent orchestration system
+
+**What Problem Does This Solve?**
+
+| Challenge | Gas Town Solution |
+| ------------------------------- | -------------------------------------------- |
+| Agents lose context on restart | Work persists in git-backed hooks |
+| Manual agent coordination | Built-in mailboxes, identities, and handoffs |
+| 4-10 agents become chaotic | Scale comfortably to 20-30 agents |
+| Work state lost in agent memory | Work state stored in Beads ledger |
+
+### Architecture
+
+```
+Town Workspace (~/gt/) → Mayor (AI Coordinator)
+                      → Rigs (Projects A, B, etc.)
+                         → Crew Members (Your workspace)
+                         → Hooks (Persistent storage via git worktree)
+                         → Polecats (Worker agents)
+```
+
+### Core Concepts
+
+- **The Mayor 🎩**: Your primary AI coordinator with full workspace context. **Start here** - just tell the Mayor what you want to accomplish.
+- **Town 🏘️**: Your workspace directory (e.g., `~/gt/`). Contains all projects, agents, and configuration.
+- **Rigs 🏗️**: Project containers. Each rig wraps a git repository and manages its associated agents.
+- **Crew Members 👤**: Your personal workspace within a rig. Where you do hands-on work.
+- **Polecats 🦨**: Ephemeral worker agents that spawn, complete a task, and disappear.
+- **Hooks 🪝**: Git worktree-based persistent storage for agent work. Survives crashes and restarts.
+- **Convoys 🚚**: Work tracking units. Bundle multiple beads that get assigned to agents.
+- **Beads Integration 📿**: Git-backed issue tracking system that stores work state as structured data.
+
+**Bead IDs** use prefix + 5-character alphanumeric format (e.g., `gt-abc12`, `hq-x7k2m`). The prefix indicates the item's origin or rig.
+
+### Quick Start
+
+```bash
+# Install and setup
+gt install ~/gt --git &&
+cd ~/gt &&
+gt config agent list &&
+gt mayor attach
+# Tell the Mayor what you want to build!
+```
+
+### Prerequisites
+
+- **Go 1.23+** - go.dev/dl
+- **Git 2.25+** - for worktree support
+- **beads (bd) 0.44.0+** - github.com/steveyegge/beads (required for custom type support)
+- **sqlite3** - for convoy database queries (usually pre-installed on macOS/Linux)
+- **tmux 3.0+** - recommended for full experience
+- **Claude Code CLI** (default runtime) - claude.ai/code
+- **Codex CLI** (optional runtime) - developers.openai.com/codex/cli
+
+### Installation Options
+
+```bash
+# Homebrew (recommended)
+brew install gastown
+
+# npm
+npm install -g @gastown/gt
+
+# From source
+go install github.com/steveyegge/gastown/cmd/gt@latest
+
+# Add Go binaries to PATH (add to ~/.zshrc or ~/.bashrc)
+export PATH="$PATH:$HOME/go/bin"
+```
+
+### Setup
+
+```bash
+# Create workspace with git initialization
+gt install ~/gt --git
+cd ~/gt
+
+# Add your first project
+gt rig add myproject https://github.com/you/repo.git
+
+# Create your crew workspace
+gt crew add yourname --rig myproject
+cd myproject/crew/yourname
+
+# Start the Mayor session (your main interface)
+gt mayor attach
+```
+
+### Basic Workflow
+
+1. **Start the Mayor**: `gt mayor attach`
+2. **In Mayor session, create a convoy with bead IDs**: `gt convoy create "Feature X" gt-abc12 gt-def34 --notify --human`
+3. **Assign work to an agent**: `gt sling gt-abc12 myproject`
+4. **Track progress**: `gt convoy list`
+5. **Monitor agents**: `gt agents`
+
+### Common Workflows
+
+**Mayor Workflow (Recommended)** - Best for coordinating complex, multi-issue work:
+
+```bash
+# Attach to Mayor
+gt mayor attach
+
+# In Mayor, create convoy and let it orchestrate
+gt convoy create "Auth System" gt-x7k2m gt-p9n4q --notify
+
+# Track progress
+gt convoy list
+```
+
+**Minimal Mode (No Tmux)** - Run individual runtime instances manually:
+
+```bash
+gt convoy create "Fix bugs" gt-abc12  # Create convoy
+gt sling gt-abc12 myproject           # Assign to worker
+claude --resume                       # Agent reads mail, runs work
+gt convoy list                        # Check progress
+```
+
+**Beads Formula Workflow** - Best for predefined, repeatable processes:
+
+```bash
+# List available formulas
+bd formula list
+
+# Run a formula with variables
+bd cook release --var version=1.2.0
+
+# Create formula instance for tracking
+bd mol pour release --var version=1.2.0
+```
+
+### Runtime Configuration
+
+Supports multiple AI coding runtimes. Per-rig settings in `settings/config.json`:
+
+```json
+{
+  "runtime": {
+    "provider": "codex",
+    "command": "codex",
+    "args": [],
+    "prompt_mode": "none"
+  }
+}
+```
+
+**Built-in agent presets**: `claude`, `gemini`, `codex`, `cursor`, `auggie`, `amp`
+
+### Key Commands Reference
+
+**Workspace Management:**
+```bash
+gt install          # Initialize workspace
+gt rig add          # Add project
+gt rig list         # List projects
+gt crew add --rig   # Create crew workspace
+```
+
+**Agent Operations:**
+```bash
+gt agents                       # List active agents
+gt sling                        # Assign work to agent
+gt sling --agent cursor         # Override runtime for this sling/spawn
+gt mayor attach                 # Start Mayor session
+gt mayor start --agent auggie   # Run Mayor with a specific agent alias
+gt prime                        # Context recovery (run inside existing session)
+```
+
+**Convoy (Work Tracking):**
+```bash
+gt convoy create [issues...]  # Create convoy with issues
+gt convoy list                # List all convoys
+gt convoy show [id]           # Show convoy details
+gt convoy add                 # Add issues to convoy
+```
+
+**Configuration:**
+```bash
+# Set custom agent command
+gt config agent set claude-glm "claude-glm --model glm-4"
+gt config agent set codex-low "codex --thinking low"
+
+# Set default agent
+gt config default-agent claude-glm
+
+# View config
+gt config show
+```
+
+**Beads Integration:**
+```bash
+bd formula list    # List formulas
+bd cook            # Execute formula
+bd mol pour        # Create trackable instance
+bd mol list        # List active instances
+```
+
+### MEOW (Mayor-Enhanced Orchestration Workflow)
+
+The recommended pattern:
+
+1. **Tell the Mayor** - Describe what you want
+2. **Mayor analyzes** - Breaks down into tasks
+3. **Convoy creation** - Mayor creates convoy with beads
+4. **Agent spawning** - Mayor spawns appropriate agents
+5. **Work distribution** - Beads slung to agents via hooks
+6. **Progress monitoring** - Track through convoy status
+7. **Completion** - Mayor summarizes results
+
+### Hook Lifecycle
+
+```
+[*] → Created (Agent spawned)
+    → Active (Work assigned)
+    → Suspended (Agent paused)
+    → Active (Agent resumed)
+    → Completed (Work done)
+    → Archived (Hook archived)
+    → [*]
+```
+
+### The Propulsion Principle
+
+Gas Town uses git hooks as a propulsion mechanism. Each hook is a git worktree with:
+
+1. **Persistent state** - Work survives agent restarts
+2. **Version control** - All changes tracked in git
+3. **Rollback capability** - Revert to any previous state
+4. **Multi-agent coordination** - Shared through git
+
+### Dashboard
+
+```bash
+# Start dashboard
+gt dashboard --port 8080
+
+# Open in browser
+open http://localhost:8080
+```
+
+Features:
+- Real-time agent status
+- Convoy progress tracking
+- Hook state visualization
+- Configuration management
+
+### Troubleshooting
+
+**Agents lose connection:**
+```bash
+gt hooks list
+gt hooks repair
+```
+
+**Convoy stuck:**
+```bash
+gt convoy refresh
+```
+
+**Mayor not responding:**
+```bash
+gt mayor detach
+gt mayor attach
+```
+
+### Shell Completions
+
+```bash
+# Bash
+gt completion bash > /etc/bash_completion.d/gt
+
+# Zsh
+gt completion zsh > "${fpath[1]}/_gt"
+
+# Fish
+gt completion fish > ~/.config/fish/completions/gt.fish
+```
+
+### Project Roles
+
+| Role | Description | Primary Interface |
+| --------------- | ------------------ | -------------------- |
+| **Mayor** | AI coordinator | `gt mayor attach` |
+| **Human (You)** | Crew member | Your crew directory |
+| **Polecat** | Worker agent | Spawned by Mayor |
+| **Hook** | Persistent storage | Git worktree |
+| **Convoy** | Work tracker | `gt convoy` commands |
+
+### Tips from README
+
+- **Always start with the Mayor** - It's designed to be your primary interface
+- **Use convoys for coordination** - They provide visibility across agents
+- **Leverage hooks for persistence** - Your work won't disappear
+- **Create formulas for repeated tasks** - Save time with Beads recipes
+- **Monitor the dashboard** - Get real-time visibility
+- **Let the Mayor orchestrate** - It knows how to manage agents
+
+---
+
