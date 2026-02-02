@@ -11,12 +11,13 @@
 ### What's Installed:
 - ✅ Gastown (`gt`) at `/usr/local/bin/gt`
 - ✅ Beads (`bd`) at `/usr/local/bin/bd`
-- ✅ Claude CLI (accessible to gastown user)
+- ✅ Claude CLI (v2.1.29) at `/home/gastown/.local/bin/claude`
 - ✅ tmux (3.2a)
-- ✅ User: `gastown`
+- ✅ User: `gastown` (with sudo privileges)
 - ✅ Working directory: `/home/gastown/gt`
 - ✅ Rig: `geekcon_herbs`
 - ✅ Beads: 28 created
+- ✅ Mayor: Running (hq-mayor tmux session)
 
 ---
 
