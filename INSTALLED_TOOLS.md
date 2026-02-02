@@ -10,7 +10,7 @@
 
 ### 🤖 AI Agents
 - **Claude CLI** v2.1.29 - `/home/gastown/.local/bin/claude`
-- **Cursor CLI** - Wrapper using Claude backend
+- **cursor-agent** - Command for Gastown (uses Claude backend)
 
 ### ☁️ AWS Tools
 - **AWS CLI** v2 - Latest version
@@ -69,9 +69,9 @@
 ### AI Agents
 ```bash
 claude --version                    # Claude CLI
-cursor --version                    # Cursor (uses Claude)
-gt mayor attach                     # Start Mayor
-gt mayor attach --agent cursor      # Use Cursor agent
+cursor-agent --version              # cursor-agent CLI
+gt mayor attach                     # Start Mayor with Claude
+gt mayor attach --agent cursor      # Start Mayor with cursor-agent
 ```
 
 ### AWS CLI
